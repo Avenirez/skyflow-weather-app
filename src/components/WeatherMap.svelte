@@ -4,41 +4,49 @@
   let { lat, lon, name } = $props();
   
   let mapElement;
-  let map;
-  let marker;
+  // Use $state.raw() — Svelte 5's $state() wraps objects in deep proxies
+  // which breaks Leaflet's internal methods (setView, setLatLng, etc.)
+  let map = $state.raw(null);
+  let marker = $state.raw(null);
 
   // Reactively update map when coordinates change
   $effect(() => {
     if (map && lat !== undefined && lon !== undefined) {
       map.setView([lat, lon], 10);
+      map.invalidateSize();
       if (marker) {
         marker.setLatLng([lat, lon]);
         marker.setPopupContent(`<b>${name}</b>`).openPopup();
       } else {
-        marker = L.marker([lat, lon]).addTo(map);
-        marker.bindPopup(`<b>${name}</b>`).openPopup();
+        const m = L.marker([lat, lon]).addTo(map);
+        m.bindPopup(`<b>${name}</b>`).openPopup();
+        marker = m;
       }
     }
   });
 
   onMount(() => {
-    // Initialize map
-    map = L.map(mapElement).setView([lat || 0, lon || 0], 10);
+    // Initialize map with initial coordinates
+    const leafletMap = L.map(mapElement).setView([lat || 0, lon || 0], 10);
     
-    // Add OpenStreetMap tiles
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-    }).addTo(map);
-    
-    if (lat !== undefined && lon !== undefined) {
-      marker = L.marker([lat, lon]).addTo(map);
-      marker.bindPopup(`<b>${name}</b>`).openPopup();
-    }
+    }).addTo(leafletMap);
 
-    // Fix map sizing issues within flex/grid containers by invalidating size
+    // Create initial marker
+    if (lat !== undefined && lon !== undefined) {
+      const m = L.marker([lat, lon]).addTo(leafletMap);
+      m.bindPopup(`<b>${name}</b>`).openPopup();
+      marker = m;
+    }
+    
+    // Fix map sizing issues within flex/grid containers
     setTimeout(() => {
-      if (map) map.invalidateSize();
-    }, 100);
+      leafletMap.invalidateSize();
+    }, 200);
+
+    // Assign to reactive variable AFTER full setup — this triggers $effect for future updates
+    map = leafletMap;
   });
 
   onDestroy(() => {
