@@ -36,7 +36,40 @@
   let isCityFavorite = $derived(favorites.some(c => c.name === selectedCity.name));
 
   onMount(() => {
-    loadRealDataForCity(selectedCity);
+    // Auto-detect user location on first visit
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          const { latitude, longitude } = position.coords;
+          // Try to reverse-geocode the coordinates to get city name
+          try {
+            const geoUrl = `https://geocoding-api.open-meteo.com/v1/search?name=&latitude=${latitude}&longitude=${longitude}&count=1&language=en&format=json`;
+            // Use a simple reverse lookup by fetching nearby city
+            const revUrl = `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=id`;
+            const res = await fetch(revUrl);
+            const data = await res.json();
+            const cityName = data.city || data.locality || data.principalSubdivision || 'Lokasi Anda';
+            const countryName = data.countryName || 'Terdeteksi otomatis';
+            const detectedCity = { name: cityName, country: countryName, lat: latitude, lon: longitude };
+            selectedCity = detectedCity;
+            loadRealDataForCity(detectedCity);
+          } catch {
+            // Reverse geocode failed, use coordinates with generic name
+            const detectedCity = { name: 'Lokasi Anda', country: 'Terdeteksi otomatis', lat: latitude, lon: longitude };
+            selectedCity = detectedCity;
+            loadRealDataForCity(detectedCity);
+          }
+        },
+        () => {
+          // User denied or geolocation failed — fall back to default city
+          loadRealDataForCity(selectedCity);
+        },
+        { timeout: 8000, maximumAge: 300000 }
+      );
+    } else {
+      // Geolocation not supported — fall back to default city
+      loadRealDataForCity(selectedCity);
+    }
   });
 
   async function loadRealDataForCity(city) {
@@ -114,7 +147,7 @@
   // History management
   function loadHistory() {
     try {
-      const saved = localStorage.getItem('skyflow_history');
+      const saved = localStorage.getItem('weatherez_history');
       return saved ? JSON.parse(saved) : [];
     } catch {
       return [];
@@ -123,7 +156,7 @@
 
   function saveHistory() {
     try {
-      localStorage.setItem('skyflow_history', JSON.stringify(searchHistory));
+      localStorage.setItem('weatherez_history', JSON.stringify(searchHistory));
     } catch { /* ignore */ }
   }
 
@@ -139,7 +172,7 @@
 
   function loadFavorites() {
     try {
-      const saved = localStorage.getItem('skyflow_favorites');
+      const saved = localStorage.getItem('weatherez_favorites');
       return saved ? JSON.parse(saved) : [];
     } catch {
       return [];
@@ -148,7 +181,7 @@
 
   function saveFavorites() {
     try {
-      localStorage.setItem('skyflow_favorites', JSON.stringify(favorites));
+      localStorage.setItem('weatherez_favorites', JSON.stringify(favorites));
     } catch { /* ignore */ }
   }
 
@@ -164,8 +197,8 @@
 </script>
 
 <svelte:head>
-  <title>SkyFlow — Prakiraan Cuaca</title>
-  <meta name="description" content="SkyFlow - Aplikasi prakiraan cuaca modern dan interaktif dengan visualisasi dinamis." />
+  <title>Weatherez — Prakiraan Cuaca</title>
+  <meta name="description" content="Weatherez - Aplikasi prakiraan cuaca modern dan interaktif dengan visualisasi dinamis." />
 </svelte:head>
 
 <AnimatedBackground {weather} />
@@ -176,7 +209,7 @@
     <div class="header-left">
       <div class="logo">
         <span class="logo-icon">⛅</span>
-        <span class="logo-text">SkyFlow</span>
+        <span class="logo-text">Weatherez</span>
       </div>
       <span class="header-date">{todayDate}</span>
     </div>
@@ -261,7 +294,7 @@
 
   <!-- Footer -->
   <footer class="app-footer">
-    <p>SkyFlow &copy; 2026 — Dibuat dengan ❤️ dan Svelte</p>
+    <p>Weatherez &copy; 2026</p>
   </footer>
 </div>
 

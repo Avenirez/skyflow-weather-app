@@ -1,5 +1,5 @@
 /**
- * SkyFlow - Weather Data Engine
+ * Weatherez - Weather Data Engine
  * Generates realistic simulated weather data for cities worldwide.
  */
 
